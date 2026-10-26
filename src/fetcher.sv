@@ -25,6 +25,9 @@ module fetcher #(
     output reg [2:0] fetcher_state,
     output reg [PROGRAM_MEM_DATA_BITS-1:0] instruction,
 );
+    // instruction-cache
+    reg [2**PROGRAM_MEM_ADDR_BITS-1:0] icache_valid;
+    reg [PROGRAM_MEM_DATA_BITS-1:0] icache [2**PROGRAM_MEM_ADDR_BITS-1:0];
     localparam IDLE = 3'b000, 
         FETCHING = 3'b001, 
         FETCHED = 3'b010;
@@ -40,9 +43,14 @@ module fetcher #(
                 IDLE: begin
                     // Start fetching when core_state = FETCH
                     if (core_state == 3'b001) begin
-                        fetcher_state <= FETCHING;
-                        mem_read_valid <= 1;
-                        mem_read_address <= current_pc;
+                        if (icache_valid[current_pc] === 1'b1) begin
+                            instruction <= icache[current_pc];
+                            fetcher_state <= FETCHED;
+                        end else begin
+                            fetcher_state <= FETCHING;
+                            mem_read_valid <= 1;
+                            mem_read_address <= current_pc;
+                        end
                     end
                 end
                 FETCHING: begin
@@ -50,6 +58,8 @@ module fetcher #(
                     if (mem_read_ready) begin
                         fetcher_state <= FETCHED;
                         instruction <= mem_read_data; // Store the instruction when received
+                        icache[current_pc] <= mem_read_data;
+                        icache_valid[current_pc] <= 1'b1;
                         mem_read_valid <= 0;
                     end
                 end
