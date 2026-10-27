@@ -8,7 +8,7 @@ from .helpers.setup import Clock
 from PIL import Image
 import numpy as np
 img = Image.open("test/rose.jpg")
-img = img.resize((128,128))
+img = img.resize((64,64))
 img = img.convert("L")
 img_array = np.array(img, dtype=np.uint8)
 data = img_array.flatten().tolist()
@@ -40,15 +40,15 @@ async def brightness(dut):
 
     new_img_l = []
     total_cycles = 0
-    total_batches = (len(data) + 248) // 249
+    total_batches = (len(data) + 255) // 256
     logger.info(f"Starting: {len(data)} pixels ({img_array.shape}) across {total_batches} batches")
 
-    for b_idx, i in enumerate(range(0, len(data), 248)):
-        batch = data[i : i + 248]
+    for b_idx, i in enumerate(range(0, len(data), 255)):
+        batch = data[i : i + 255]
         actual_pixels = len(batch)
 
-        if actual_pixels < 248:
-            batch = batch + [0] * (248 - actual_pixels)
+        if actual_pixels < 255:
+            batch = batch + [0] * (255 - actual_pixels)
 
         dut.start.value = 0
         dut.reset.value = 1
