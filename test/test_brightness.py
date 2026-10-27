@@ -7,12 +7,12 @@ from .helpers.logger import logger
 from .helpers.setup import Clock
 from PIL import Image
 import numpy as np
-img = Image.open("C:/Users/janan/Coding!/tiny-gpu/test/parrot.jpg")
-img = img.resize((64,64))
+img = Image.open("test/rose.jpg")
+img = img.resize((128,128))
 img = img.convert("L")
 img_array = np.array(img, dtype=np.uint8)
 data = img_array.flatten().tolist()
-k = 40
+k = 0
 
 program = [
     0b0101000011011110,   # MUL R0, %blockIdx, %blockDim
@@ -85,6 +85,11 @@ async def brightness(dut):
     logger.info(f"Completed all {len(new_img_l)} pixels in {total_cycles} total cycles")
 
     new_img = np.array(new_img_l, dtype=np.uint8).reshape(img_array.shape)
+    actual_img = np.clip(img_array.astype(np.uint16) + k, 0, 255).astype(np.uint8)
+    for idx, (gpu_val, exp_val) in enumerate(zip(new_img_l, actual_img.flatten())):
+        assert gpu_val == exp_val, f"Pixel {idx} mismatch: GPU got {gpu_val}, expected {exp_val} (orig={data[idx]}, k={k})"
+    logger.info("PASS: All pixels match the expected output 100%!")
     nimg = Image.fromarray(new_img, mode="L")
-    nimg.save("C:/Users/janan/Coding!/tiny-gpu/test/parrot_brightened.jpg")
+    nimg.save("test/rose_brightened.jpg")
     nimg.show()
+    
