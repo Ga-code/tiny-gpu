@@ -1,31 +1,30 @@
-# Tiny-GPU: Image Brightness Adjustment & Architectural Optimizations[cite: 4]
+# Tiny-GPU: Image Brightness Adjustment & Architectural Optimizations
 
-This repository contains an end-to-end implementation of an 8-bit saturating image brightness adjustment kernel on `tiny-gpu`, along with structural upgrades for **Divergence**, **Instruction Caching (I-Cache)**, and **ALU Bug Fixes**.[cite: 4]
+This repository contains an end-to-end implementation of an 8-bit saturating image brightness adjustment kernel on `tiny-gpu`, along with structural upgrades for **Divergence**, **Instruction Caching (I-Cache)**, and **ALU Bug Fixes**.
 
 ---
 
-## 1. Repository Structure & Setup[cite: 4]
+## 1. Repository Structure & Setup
 
 * **`src/`**: SystemVerilog RTL source files (modified `alu.sv`, `core.sv`, `scheduler.sv`, and `fetcher.sv`).[cite: 4]
 * **`test/test_brightness.py`**: Cocotb testbench implementing host-to-device memory batching, cycle telemetry, and bit-accurate verification against a NumPy golden model.[cite: 4]
 * **`test/parrot.jpg`, `test/rose.jpg` & `test/parrot_brightened_original.jpg`, `test/rose_brightened_original.jpg`**: Input test images and gray-scaled and down-sized into appropriate test examples to compare output against.[cite: 4]
 * **`build/gpu.v`**: Compiled Verilog-2005 netlist generated via `sv2v`.[cite: 4]
 
-### Running the Simulation[cite: 4]
+### Running the Simulation
 ```bash
 # 1. Compile and run, the file also contains verification
 make test_brightness
 ```
-[cite: 4]
+
 
 ---
 
 ## 2. Thread Mapping & ISA Kernel Code
 
 ### Pixel-to-Thread Mapping
-Each 2D grayscale image ($H \times W$) is flattened into a 1D array of unsigned 8-bit pixels. Because `tiny-gpu` has an 8-bit address space ($2^8 = 256$ bytes), the image is then split into batches of **248 pixels** ($31 \text{ blocks} \times 8 \text{ threads/wave}$). 
+Each 2D grayscale image ($H \times W$) is flattened into a 1D array of unsigned 8-bit pixels. Because `tiny-gpu` has an 8-bit address space ($2^8 = 256$ bytes), the image is then split into batches of **255 pixels**.
 
-$$R_0 = (\text{\%blockIdx} \times \text{\%blockDim}) + \text{\%threadIdx}$$
 
 ### Saturating Brightness ISA Kernel
 To prevent 8-bit overflow ($\text{pixel} + k > 255$) from wrapping around modulo 256, each thread calculates the remaining headroom before saturation ($R_4 = 255 - \text{pixel}$) and compares it against the brightness constant $k$:
@@ -85,9 +84,9 @@ Output accuracy is verified in `test/test_brightness.py` by comparing every GPU-
 1. **8-Bit Datapath & Memory Addressing Limit**:
    * Because `DATA_MEM_ADDR_BITS = 8` and general-purpose registers (`R0`–`R15`) are 8 bits wide, the hardware cannot natively address more than 256 bytes or index past thread 255 in a single launch.
    * Additionally, the `CONST` instruction (`1001_dddd_iiiiiiii`) only supports an 8-bit immediate field (`#0`–`#255`), tying constants to 8 bits unless the 16-bit instruction format is modified.
-2. **Core Scaling vs. Memory Controller Crossbar Overhead**:
+2. **Core Scaling vs. Memory Channels**:
    * Scaling `NUM_CORES` and `THREADS_PER_BLOCK` reduces simulated GPU clock cycles per batch, but it requires increasing `DATA_MEM_NUM_CHANNELS` to prevent `LDR`/`STR` bottlenecks, which increases setup time and hence total time taken per batch
-3. **Python/C++ VPI Context Switching**:
+3. **Python wait times**:
    * Calling `await RisingEdge(dut.clk)` and evaluating `memory.run()` in Python on every clock tick limits simulation speed since verilog has to talk to python for basically every cycle., making the Python/Verilog VPI handoff the primary wall-clock bottleneck. Ram that is not associated with python is likely to significantly decrease compute time.
 
 ---
